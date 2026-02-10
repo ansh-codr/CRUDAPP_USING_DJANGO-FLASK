@@ -1,24 +1,13 @@
-import os
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, flash
 from flask_sqlalchemy import SQLAlchemy	
 
 app = Flask(__name__)
-database_url = os.getenv("DATABASE_URL", "").strip()
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-if database_url:
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-else:
-    os.makedirs(app.instance_path, exist_ok=True)
-    db_path = os.path.join(app.instance_path, "employee.db")
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///employee.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATION"] = False
+app.config['SECRET_KEY'] = 'supersecretkey'
 
 db = SQLAlchemy(app)
-
-with app.app_context():
-    db.create_all()
+app.app_context().push()
 
 class Employee(db.Model):						
     sno = db.Column(db.Integer, primary_key = True)
@@ -28,8 +17,12 @@ class Employee(db.Model):
 @app.route("/", methods=['GET', 'POST'])
 def home():
     if request.method == 'POST':
-        name = request.form['name']
-        email = request.form['email']
+        name = request.form.get('name',"").strip()
+        email = request.form.get('email',"").strip()
+
+        if not name or not email:
+            flash("Name and Email cannot be empty!", "error")
+            return redirect("/")
         employee = Employee(name = name, email = email)
         db.session.add(employee)
         db.session.commit()
@@ -62,5 +55,4 @@ def update(sno):
     return render_template("update.html", employee=employee)
 
 if __name__ == '__main__':
-    port = int(os.getenv("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(debug=True)
